@@ -108,6 +108,81 @@ contract SimpleVaultTest is Test {
         assertEq(vault.balances(address(this)), 0);
     }
 
+    // Testa com múltiplos usuários usando vm.prank
+    function testDepositWithMultipleUsers() public {
+        address alice = address(0x1);
+        address bob = address(0x2);
+        
+        // Alice faz um depósito de 1 ETH
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        
+        // Bob faz um depósito de 2 ETH
+        vm.prank(bob);
+        vault.deposit{value: 2 ether}();
+        
+        // Verifica os saldos de cada um
+        assertEq(vault.balances(alice), 1 ether);
+        assertEq(vault.balances(bob), 2 ether);
+    }
+
+    // Testa saque de Alice após 1 minuto
+    function testAliceWithdrawAfterDelay() public {
+        address alice = address(0x1);
+        
+        // Alice deposita 1 ETH
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+        
+        // Verifica tempo até saque
+        uint256 timeLeft = vault.getTimeUntilWithdraw(alice);
+        assertGt(timeLeft, 0);
+        
+        // Avança o tempo em 61 segundos
+        vm.warp(block.timestamp + 61 seconds);
+        
+        // Alice agora pode sacar
+        vm.prank(alice);
+        vault.withdraw();
+        
+        // Verifica se o saldo foi resetado
+        assertEq(vault.balances(alice), 0);
+    }
+
+    // Testa que Alice não pode sacar os fundos de Bob
+    function testAliceCannotWithdrawBobFunds() public {
+        address alice = address(0x1);
+        address bob = address(0x2);
+        
+        // Bob deposita 1 ETH
+        vm.prank(bob);
+        vault.deposit{value: 1 ether}();
+        
+        // Avança o tempo
+        vm.warp(block.timestamp + 61 seconds);
+        
+        // Alice tenta sacar (mas não tem saldo)
+        vm.prank(alice);
+        vm.expectRevert("Saldo insuficiente");
+        vault.withdraw();
+        
+        // Bob ainda tem seu saldo
+        assertEq(vault.balances(bob), 1 ether);
+    }
+
+    // Testa eventos com vm.prank
+    function testDepositEventWithPrank() public {
+        address alice = address(0x1);
+        
+        // Usa vm.expectEmit para verificar eventos
+        vm.expectEmit(true, false, false, true);
+        emit SimpleVault.Deposited(alice, 1 ether);
+        
+        // Alice faz o depósito
+        vm.prank(alice);
+        vault.deposit{value: 1 ether}();
+    }
+
     // Precisa para receber ETH
     receive() external payable {}
 }
