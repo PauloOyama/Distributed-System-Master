@@ -113,6 +113,10 @@ contract SimpleVaultTest is Test {
         address alice = address(0x1);
         address bob = address(0x2);
         
+        // Dá 10 ETH para Alice e Bob
+        vm.deal(alice, 10 ether);
+        vm.deal(bob, 10 ether);
+        
         // Alice faz um depósito de 1 ETH
         vm.prank(alice);
         vault.deposit{value: 1 ether}();
@@ -129,6 +133,9 @@ contract SimpleVaultTest is Test {
     // Testa saque de Alice após 1 minuto
     function testAliceWithdrawAfterDelay() public {
         address alice = address(0x1);
+        
+        // Dá 10 ETH para Alice
+        vm.deal(alice, 10 ether);
         
         // Alice deposita 1 ETH
         vm.prank(alice);
@@ -154,6 +161,9 @@ contract SimpleVaultTest is Test {
         address alice = address(0x1);
         address bob = address(0x2);
         
+        // Dá ETH para Bob
+        vm.deal(bob, 10 ether);
+        
         // Bob deposita 1 ETH
         vm.prank(bob);
         vault.deposit{value: 1 ether}();
@@ -173,6 +183,9 @@ contract SimpleVaultTest is Test {
     // Testa eventos com vm.prank
     function testDepositEventWithPrank() public {
         address alice = address(0x1);
+        
+        // Dá ETH para Alice
+        vm.deal(alice, 10 ether);
         
         // Usa vm.expectEmit para verificar eventos
         vm.expectEmit(true, false, false, true);
