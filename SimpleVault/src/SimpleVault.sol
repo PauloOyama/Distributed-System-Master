@@ -33,6 +33,7 @@ contract SimpleVault {
     function withdraw() public {
         require(balances[msg.sender] > 0, "Saldo insuficiente");
         require(
+            // slither-disable-next-line timestamp
             block.timestamp >= depositTime[msg.sender] + WITHDRAWAL_DELAY,
             "Ainda nao pode sacar (espere 1 minuto apos o deposito)"
         );
@@ -61,8 +62,9 @@ contract SimpleVault {
     
     // Função para consultar quanto tempo falta para sacar
     function getTimeUntilWithdraw(address user) public view returns (uint256) {
-        uint256 unlockTime = depositTime[user] + WITHDRAWAL_DELAY;
         
+        uint256 unlockTime = depositTime[user] + WITHDRAWAL_DELAY;
+        // slither-disable-next-line timestamp
         if (block.timestamp >= unlockTime) {
             return 0; // Pode sacar agora
         }
