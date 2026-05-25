@@ -1,5 +1,36 @@
 # Como Rodar o SkeenMessenger
 
+## 📖 Entendendo Deploy vs Test (Para Iniciantes)
+
+Antes de começar, é importante entender a diferença:
+
+### **Deploy.s.sol** (Enviar para Blockchain)
+- ✅ **Coloca o contrato NA BLOCKCHAIN de verdade**
+- Usa sua chave privada real e gasta GAS
+- Cria um contrato que qualquer um pode interagir
+- Executado com: `forge script`
+- **Exemplo:** Deploy em Sepolia, seu contrato fica lá para sempre
+
+### **Test.t.sol** (Testar Localmente)
+- ✅ **Testa o contrato SEM gastar GAS**
+- Roda em memória, simula situações
+- Verifica se o código funciona corretamente antes de fazer deploy
+- Executado com: `forge test`
+- **Exemplo:** Testar se `sendMessage()` funciona sem enviar nada de verdade
+
+**Analogia simples:**
+```
+Test = Ensaiar uma apresentação (sem público)
+Deploy = Fazer a apresentação de verdade (com público)
+```
+
+### Fluxo Correto de Desenvolvimento:
+1. Escrever código no contrato
+2. Testar localmente com `forge test` (grátis, rápido)
+3. Se passou nos testes, fazer Deploy com `forge script` (real, caro)
+
+---
+
 ## 0. **Instalar Dependências**
 
 ```bash
@@ -48,7 +79,39 @@ forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
 forge test
 ```
 
-Crie um arquivo `test/SkeenMessenger.t.sol` com testes.
+Crie um arquivo `test/SkeenMessenger.t.sol` com testes. **Exemplo básico:**
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import {Test} from "forge-std/Test.sol";
+import {SkeenMessenger} from "../src/SkeenMessenger.sol";
+
+contract SkeenMessengerTest is Test {
+    SkeenMessenger public messenger;
+
+    function setUp() public {
+        // Cria o contrato com um endereço fake de Mailbox
+        messenger = new SkeenMessenger(address(0x123));
+    }
+
+    function testSendMessage() public {
+        // Testa se a função sendMessage não falha
+        messenger.sendMessage(1, address(0x456), "Olá!");
+    }
+
+    function testHandleMessage() public {
+        // Testa o recebimento de mensagens
+        bytes memory messageBody = abi.encode("Mensagem recebida");
+        messenger.handle(1, bytes32(uint256(1)), messageBody);
+    }
+}
+```
+
+**Diferença prática:**
+- ❌ `forge test` = Não custa nada, roda localmente
+- ✅ `forge script` = Custa GAS, envia para blockchain real
 
 ## Endereços do Mailbox (Hyperlane)
 

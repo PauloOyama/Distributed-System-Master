@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IMessageRecipient} from "@hyperlane-xyz/core/contracts/interfaces/IMessageRecipient.sol";
-import {IMailbox} from "@hyperlane-xyz/core/contracts/interfaces/IMailbox.sol";
+import {IMessageRecipient} from "@hyperlane-xyz/core/interfaces/IMessageRecipient.sol";
+import {IMailbox} from "@hyperlane-xyz/core/interfaces/IMailbox.sol";
 
 contract SkeenMessenger is IMessageRecipient {
     IMailbox public mailbox;
@@ -37,7 +37,7 @@ contract SkeenMessenger is IMessageRecipient {
         uint32 _origin,
         bytes32 _sender,
         bytes calldata _messageBody
-    ) external {
+    ) external payable {
         require(msg.sender == address(mailbox), "Only mailbox can call handle");
 
         string memory message = abi.decode(_messageBody, (string));
