@@ -2,3 +2,9 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+
+[remappings]
+"@hyperlane-xyz/core/=lib/hyperlane-monorepo/solidity/core/"
+"@hyperlane-xyz/core/*=lib/hyperlane-monorepo/solidity/core/*"
+"@hyperlane-xyz/=lib/hyperlane-monorepo/solidity/"
+"forge-std/=lib/forge-std/src/"

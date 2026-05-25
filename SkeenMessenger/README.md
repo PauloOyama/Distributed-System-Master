@@ -1,28 +1,25 @@
 # Como Rodar o SkeenMessenger
 
-## 1. **Compilar o contrato**
+## 0. **Instalar Dependências**
 
 ```bash
 cd SkeenMessenger
+
+# Adicionar submódulos (Hyperlane e forge-std)
+git submodule add https://github.com/hyperlane-xyz/hyperlane-monorepo.git lib/hyperlane-monorepo
+git submodule add https://github.com/foundry-rs/forge-std lib/forge-std
+
+# Inicializar os submódulos
+git submodule update --init --recursive
+```
+
+## 1. **Compilar o contrato**
+
+```bash
 forge build
 ```
 
-## 2. **Instalar dependências Hyperlane**
-
-Você precisa adicionar as dependências do Hyperlane. Crie um arquivo `foundry.toml` com:
-
-```toml
-remappings = [
-    "@hyperlane-xyz/core/=lib/hyperlane-monorepo/solidity/core/"
-]
-```
-
-E adicione o submódulo:
-```bash
-git submodule add https://github.com/hyperlane-xyz/hyperlane-monorepo.git lib/hyperlane-monorepo
-```
-
-## 3. **Deploy Local (Anvil)**
+## 2. **Deploy Local (Anvil)**
 
 ```bash
 # Terminal 1: Inicie o Anvil
@@ -35,7 +32,7 @@ export MAILBOX_ADDRESS="0x0000000000000000000000000000000000000000"
 forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 ```
 
-## 4. **Deploy em Testnet (ex: Sepolia)**
+## 3. **Deploy em Testnet (ex: Sepolia)**
 
 ```bash
 export PRIVATE_KEY="sua_chave_privada_aqui"
@@ -45,7 +42,7 @@ export RPC_URL="https://sepolia.infura.io/v3/sua_chave_infura"
 forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
 ```
 
-## 5. **Testar Localmente**
+## 4. **Testar Localmente**
 
 ```bash
 forge test
