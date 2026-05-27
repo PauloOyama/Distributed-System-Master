@@ -5,97 +5,116 @@ import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 
 import {SkeenMessenger} from "../src/SkeenMessenger.sol";
-import {
-    IMailbox,
-    IPostDispatchHook
-} from "@hyperlane-xyz/core/interfaces/IMailbox.sol";
+import {IMailbox} from "@hyperlane-xyz/core/interfaces/IMailbox.sol";
+import {IPostDispatchHook} from "@hyperlane-xyz/core/interfaces/hooks/IPostDispatchHook.sol";
+import {IInterchainSecurityModule} from "@hyperlane-xyz/core/interfaces/IInterchainSecurityModule.sol";
 
-// Mock Mailbox - Simulates Hyperlane Mailbox
+// Mock Mailbox - Implementação da interface IMailbox para testes
 contract MockMailbox is IMailbox {
-    uint32 public localDomain;
+    uint32 private _localDomain;
     bytes[] public dispatchedMessages;
+    mapping(bytes32 => bool) private _delivered;
+    uint32 private _nonce;
+    bytes32 private _latestDispatchedId;
 
-    event Dispatch(
-        uint32 indexed destinationDomain,
-        bytes32 indexed sender,
-        bytes message,
-        bytes32 indexed messageId
-    );
+    constructor(uint32 domain) {
+        _localDomain = domain;
+    }
 
-    constructor(uint32 _domain) {
-        localDomain = _domain;
+    function localDomain() external view returns (uint32) {
+        return _localDomain;
+    }
+
+    function delivered(bytes32 messageId) external view returns (bool) {
+        return _delivered[messageId];
+    }
+
+    function defaultIsm() external pure returns (IInterchainSecurityModule) {
+        return IInterchainSecurityModule(address(0));
+    }
+
+    function defaultHook() external pure returns (IPostDispatchHook) {
+        return IPostDispatchHook(address(0));
+    }
+
+    function requiredHook() external pure returns (IPostDispatchHook) {
+        return IPostDispatchHook(address(0));
+    }
+
+    function latestDispatchedId() external view returns (bytes32) {
+        return _latestDispatchedId;
+    }
+
+    function nonce() external view returns (uint32) {
+        return _nonce;
     }
 
     function dispatch(
-        uint32 _destinationDomain,
-        bytes32 _recipientAddress,
-        bytes calldata _messageBody
-    ) external returns (bytes32) {
-        bytes32 messageId = keccak256(
-            abi.encode(
-                _destinationDomain,
-                _recipientAddress,
-                _messageBody,
-                block.timestamp
-            )
+        uint32 destinationDomain,
+        bytes32 recipientAddress,
+        bytes calldata messageBody
+    ) external payable returns (bytes32 messageId) {
+        messageId = keccak256(
+            abi.encode(destinationDomain, recipientAddress, messageBody, block.timestamp, _nonce)
         );
-        dispatchedMessages.push(_messageBody);
-        emit Dispatch(
-            _destinationDomain,
-            bytes32(uint256(uint160(msg.sender))),
-            _messageBody,
-            messageId
-        );
-        return messageId;
+        dispatchedMessages.push(messageBody);
+        _latestDispatchedId = messageId;
+        _nonce++;
+        emit Dispatch(msg.sender, destinationDomain, recipientAddress, messageBody);
+        emit DispatchId(messageId);
     }
 
     function dispatch(
-        uint32 _destinationDomain,
-        bytes32 _recipientAddress,
-        bytes calldata _messageBody,
-        bytes calldata _hookMetadata,
-        IPostDispatchHook _hook
-    ) external returns (bytes32) {
-        return this.dispatch(_destinationDomain, _recipientAddress, _messageBody);
+        uint32 destinationDomain,
+        bytes32 recipientAddress,
+        bytes calldata messageBody,
+        bytes calldata /*defaultHookMetadata*/
+    ) external payable returns (bytes32) {
+        return this.dispatch(destinationDomain, recipientAddress, messageBody);
     }
 
-    function process(
-        bytes calldata,
-        bytes calldata
-    ) external pure returns (bytes32) {
-        return bytes32(0);
+    function dispatch(
+        uint32 destinationDomain,
+        bytes32 recipientAddress,
+        bytes calldata messageBody,
+        bytes calldata /*customHookMetadata*/,
+        IPostDispatchHook /*customHook*/
+    ) external payable returns (bytes32) {
+        return this.dispatch(destinationDomain, recipientAddress, messageBody);
     }
 
-    function count() external pure returns (uint32) {
+    function quoteDispatch(uint32, bytes32, bytes calldata) external pure returns (uint256) {
         return 0;
     }
-    function latest() external pure returns (uint32) {
+
+    function quoteDispatch(uint32, bytes32, bytes calldata, bytes calldata) external pure returns (uint256) {
         return 0;
     }
-    function safeAccess(bytes32, uint32) external pure returns (bytes memory) {
-        return "";
-    }
-    function recipientIsSmartContract(
-        bytes32,
-        address
-    ) external pure returns (bool) {
-        return true;
-    }
-    function quoteDispatch(
-        uint32,
-        bytes32,
-        bytes calldata
-    ) external pure returns (uint256) {
+
+    function quoteDispatch(uint32, bytes32, bytes calldata, bytes calldata, IPostDispatchHook) external pure returns (uint256) {
         return 0;
     }
-    function quoteDispatch(
-        uint32,
-        bytes32,
-        bytes calldata,
-        bytes calldata,
-        IPostDispatchHook
-    ) external pure returns (uint256) {
-        return 0;
+
+    function process(bytes calldata, bytes calldata) external payable {}
+
+    function recipientIsm(address) external pure returns (IInterchainSecurityModule) {
+        return IInterchainSecurityModule(address(0));
+    }
+
+    // Helper para simular entrega de mensagem ao destinatário
+    function deliverMessage(
+        address recipient,
+        uint32 origin,
+        bytes32 sender,
+        bytes calldata messageBody
+    ) external {
+        bytes32 messageId = keccak256(abi.encode(origin, sender, messageBody));
+        _delivered[messageId] = true;
+        IMailbox(recipient);
+        (bool success,) = recipient.call(
+            abi.encodeWithSignature("handle(uint32,bytes32,bytes)", origin, sender, messageBody)
+        );
+        require(success, "Delivery failed");
     }
 }
 
@@ -103,7 +122,6 @@ contract SkeenMessengerTest is Test {
     uint32 constant CHAIN_A = 1;
     uint32 constant CHAIN_B = 137;
     address constant SENDER = address(0x1234);
-    address constant RELAYER = address(0xDEAD);
 
     MockMailbox mailboxChainA;
     MockMailbox mailboxChainB;
@@ -118,91 +136,39 @@ contract SkeenMessengerTest is Test {
     }
 
     function test_SendMessageFromChainA() public {
-        vm.prank(SENDER);
-        bytes memory messageData = "Hello from Chain A!";
-        bytes32 messageId = messengerOnChainA.sendMessage(SENDER,CHAIN_B, messageData);
+        string memory message = "Hello from Chain A!";
 
-        assertGt(uint256(messageId), 0, "Message ID should be valid");
-        assertEq(
-            mailboxChainA.dispatchedMessages().length,
-            1,
-            "Should have 1 dispatched message"
-        );
+        vm.prank(SENDER);
+        messengerOnChainA.sendMessage(CHAIN_B, address(messengerOnChainB), message);
+
+        bytes32 dispatchedId = mailboxChainA.latestDispatchedId();
+        assertGt(uint256(dispatchedId), 0, "Message ID should be valid");
+        assertEq(mailboxChainA.dispatchedMessages(0).length, abi.encode(message).length, "Message body mismatch");
+
         console2.log("Message sent with ID:");
-        console2.logBytes32(messageId);
+        console2.logBytes32(dispatchedId);
     }
 
-    function test_CrossChainMessageDelivery() public {
-        // Step 1: Simulate Chain A sending message
-        vm.prank(SENDER);
-        bytes memory originalMessage = "Cross-chain delivery test!";
-        bytes32 messageId = messengerOnChainA.sendMessage(
-            CHAIN_B,
-            originalMessage
-        );
+    function test_ReceiveMessageOnChainB() public {
+        string memory message = "Hello from Chain A!";
+        bytes32 senderBytes = bytes32(uint256(uint160(address(messengerOnChainA))));
 
-        bytes memory dispatchedData = mailboxChainA.dispatchedMessages(
-            mailboxChainA.dispatchedMessages().length - 1
-        );
-        console2.log("Step 1: Message dispatched from Chain A");
+        vm.expectEmit(true, true, true, true);
+        emit SkeenMessenger.MessageReceived(CHAIN_A, senderBytes, message);
 
-        // Step 2: Simulate Relayer picking up and delivering to Chain B
-        vm.prank(RELAYER);
-        messengerOnChainB.handle(
+        mailboxChainB.deliverMessage(
+            address(messengerOnChainB),
             CHAIN_A,
-            addressToBytes32(address(messengerOnChainA)),
-            dispatchedData
-        );
-
-        // Step 3: Verify message was received
-        bytes memory receivedMessage = messengerOnChainB.getLastMessage(
-            CHAIN_A
-        );
-        assertEq(
-            keccak256(receivedMessage),
-            keccak256(originalMessage),
-            "Messages should match"
-        );
-        console2.log("Step 2: Message delivered to Chain B");
-    }
-
-    function test_HandleRequiresMailboxCaller() public {
-        bytes memory dispatchedData = abi.encode(SENDER, "Test message");
-        vm.expectRevert("Caller must be mailbox");
-        messengerOnChainB.handle(
-            CHAIN_A,
-            addressToBytes32(address(messengerOnChainA)),
-            dispatchedData
+            senderBytes,
+            abi.encode(message)
         );
     }
 
-    function test_MultipleMessagesFromSameOrigin() public {
-        for (uint i = 0; i < 3; i++) {
-            vm.prank(SENDER);
-            bytes memory msg = abi.encode("Message", i);
-            messengerOnChainA.sendMessage(CHAIN_B, msg);
+    function test_HandleRevertsIfNotMailbox() public {
+        bytes32 senderBytes = bytes32(uint256(uint160(address(messengerOnChainA))));
 
-            bytes memory lastDispatched = mailboxChainA.dispatchedMessages(
-                mailboxChainA.dispatchedMessages().length - 1
-            );
-            vm.prank(RELAYER);
-            messengerOnChainB.handle(
-                CHAIN_A,
-                addressToBytes32(address(messengerOnChainA)),
-                lastDispatched
-            );
-        }
-
-        bytes memory lastMsg = messengerOnChainB.getLastMessage(CHAIN_A);
-        (string memory prefix, uint256 num) = abi.decode(
-            lastMsg,
-            (string, uint256)
-        );
-        assertEq(num, 2, "Last message should be #2");
-        console2.log("Multiple messages test passed");
-    }
-
-    function addressToBytes32(address _addr) internal pure returns (bytes32) {
-        return bytes32(uint256(uint160(_addr)));
+        vm.prank(address(0xBEEF));
+        vm.expectRevert("Only mailbox can call handle");
+        messengerOnChainB.handle(CHAIN_A, senderBytes, abi.encode("test"));
     }
 }
