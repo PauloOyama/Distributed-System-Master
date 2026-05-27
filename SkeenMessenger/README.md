@@ -61,6 +61,11 @@ export PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb476cadeee4c811dac45ba
 export MAILBOX_ADDRESS="0x0000000000000000000000000000000000000000"
 
 forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+
+forge script script/Deploy.s.sol \
+  --rpc-url http://localhost:8545 \
+  --broadcast \
+  --private-key 0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
 
 ## 3. **Deploy em Testnet (ex: Sepolia)**
