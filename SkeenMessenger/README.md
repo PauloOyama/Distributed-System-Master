@@ -81,42 +81,140 @@ forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
 ## 4. **Testar Localmente**
 
 ```bash
-forge test
+forge test -v
 ```
 
-Crie um arquivo `test/SkeenMessenger.t.sol` com testes. **Exemplo básico:**
+---
+
+## Como Funciona o Mock do Mailbox
+
+### Por que mockar?
+
+O `SkeenMessenger` depende do `IMailbox` do Hyperlane para enviar e receber mensagens cross-chain. Em testes, não há uma rede real nem um relayer rodando — então criamos um **contrato falso (mock)** que imita o comportamento do Mailbox real.
+
+```
+Teste real (sem mock):          Teste com mock:
+SkeenMessenger → Mailbox real   SkeenMessenger → MockMailbox
+                 ↓                               ↓
+           Rede Hyperlane              Armazena mensagem em memória
+           (não existe em teste)       (controlado pelo teste)
+```
+
+### O que o MockMailbox faz
+
+O `MockMailbox` implementa a interface `IMailbox` com comportamento simplificado:
+
+| Função real                  | Comportamento no mock                          |
+|------------------------------|------------------------------------------------|
+| `dispatch(...)`              | Salva a mensagem em `dispatchedMessages[]` e retorna um `messageId` calculado localmente |
+| `latestDispatchedId()`       | Retorna o ID da última mensagem despachada     |
+| `delivered(bytes32)`         | Retorna se um messageId foi marcado como entregue |
+| `quoteDispatch(...)`         | Retorna `0` (sem custo em testes)              |
+| `process(...)`               | Não faz nada (entrega é simulada manualmente)  |
+
+### Como o mock é criado
 
 ```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// 1. Declare o mock implementando a interface IMailbox
+contract MockMailbox is IMailbox {
+    uint32 private _localDomain;
+    bytes[] public dispatchedMessages;   // guarda mensagens enviadas
+    bytes32 private _latestDispatchedId;
 
-import {Test} from "forge-std/Test.sol";
-import {SkeenMessenger} from "../src/SkeenMessenger.sol";
+    constructor(uint32 domain) {
+        _localDomain = domain;
+    }
 
+    // dispatch() simula o envio: salva a mensagem e gera um ID
+    function dispatch(uint32 dest, bytes32 recipient, bytes calldata body)
+        external payable returns (bytes32 messageId)
+    {
+        messageId = keccak256(abi.encode(dest, recipient, body, block.timestamp, _nonce));
+        dispatchedMessages.push(body);
+        _latestDispatchedId = messageId;
+        _nonce++;
+    }
+
+    // ... demais funções da interface retornam valores neutros
+}
+```
+
+### Como o mock é usado nos testes
+
+```solidity
 contract SkeenMessengerTest is Test {
-    SkeenMessenger public messenger;
+    MockMailbox mailboxChainA;
+    MockMailbox mailboxChainB;
+    SkeenMessenger messengerOnChainA;
+    SkeenMessenger messengerOnChainB;
 
     function setUp() public {
-        // Cria o contrato com um endereço fake de Mailbox
-        messenger = new SkeenMessenger(address(0x123));
-    }
+        // 2. Cria um mailbox mock para cada "chain"
+        mailboxChainA = new MockMailbox(1);    // simula Ethereum (domain 1)
+        mailboxChainB = new MockMailbox(137);  // simula Polygon (domain 137)
 
-    function testSendMessage() public {
-        // Testa se a função sendMessage não falha
-        messenger.sendMessage(1, address(0x456), "Olá!");
-    }
-
-    function testHandleMessage() public {
-        // Testa o recebimento de mensagens
-        bytes memory messageBody = abi.encode("Mensagem recebida");
-        messenger.handle(1, bytes32(uint256(1)), messageBody);
+        // 3. Injeta o mock no contrato (no lugar do Mailbox real)
+        messengerOnChainA = new SkeenMessenger(address(mailboxChainA));
+        messengerOnChainB = new SkeenMessenger(address(mailboxChainB));
     }
 }
 ```
 
-**Diferença prática:**
-- ❌ `forge test` = Não custa nada, roda localmente
-- ✅ `forge script` = Custa GAS, envia para blockchain real
+### Fluxo de um teste de envio
+
+```
+test_SendMessageFromChainA()
+        │
+        ▼
+messengerOnChainA.sendMessage(CHAIN_B, recipient, "Hello!")
+        │
+        ▼  chama internamente:
+mailboxChainA.dispatch(137, recipient, encodedMessage)
+        │
+        ▼  MockMailbox salva em memória:
+dispatchedMessages[0] = encodedMessage
+_latestDispatchedId   = keccak256(...)
+        │
+        ▼  teste verifica:
+assertGt(uint256(mailboxChainA.latestDispatchedId()), 0)  ✅
+```
+
+### Fluxo de um teste de recebimento (entrega simulada)
+
+Como não há relayer real, o mock expõe `deliverMessage()` para simular a entrega:
+
+```
+test_ReceiveMessageOnChainB()
+        │
+        ▼
+mailboxChainB.deliverMessage(address(messengerOnChainB), origin, sender, body)
+        │
+        ▼  MockMailbox chama diretamente:
+messengerOnChainB.handle(origin, sender, body)
+        │
+        ▼  SkeenMessenger emite:
+emit MessageReceived(origin, sender, message)  ✅
+```
+
+```solidity
+// No teste, verificamos o evento emitido com vm.expectEmit:
+vm.expectEmit(true, true, true, true);
+emit SkeenMessenger.MessageReceived(CHAIN_A, senderBytes, "Hello!");
+
+mailboxChainB.deliverMessage(address(messengerOnChainB), CHAIN_A, senderBytes, abi.encode("Hello!"));
+```
+
+### Resumo do padrão
+
+```
+1. Criar MockMailbox implementando IMailbox
+2. Injetar o mock no construtor do SkeenMessenger
+3. Chamar funções do SkeenMessenger normalmente
+4. Inspecionar o estado do mock para verificar o que foi enviado
+5. Usar deliverMessage() para simular o relayer entregando a mensagem
+```
+
+---
 
 ## Endereços do Mailbox (Hyperlane)
 
