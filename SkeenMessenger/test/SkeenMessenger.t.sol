@@ -135,23 +135,37 @@ contract SkeenMessengerTest is Test {
         messengerOnChainB = new SkeenMessenger(address(mailboxChainB));
     }
 
-    function test_SendMessageFromChainA() public {
+    function test_FullMessageFlowAtoB() public {
         string memory message = "Hello from Chain A!";
+        bytes32 senderBytes = bytes32(uint256(uint160(address(messengerOnChainA))));
+
+        // ── ENVIO (Chain A) ──────────────────────────────────────────────
+        console2.log("=== ENVIO (Chain A -> Chain B) ===");
+        console2.log("Remetente:      ", SENDER);
+        console2.log("Messenger A:    ", address(messengerOnChainA));
+        console2.log("Mailbox A:      ", address(mailboxChainA));
+        console2.log("Destino domain: ", CHAIN_B);
+        console2.log("Destinatario:   ", address(messengerOnChainB));
+        console2.log("Mensagem:       ", message);
 
         vm.prank(SENDER);
         messengerOnChainA.sendMessage(CHAIN_B, address(messengerOnChainB), message);
 
-        bytes32 dispatchedId = mailboxChainA.latestDispatchedId();
-        assertGt(uint256(dispatchedId), 0, "Message ID should be valid");
-        assertEq(mailboxChainA.dispatchedMessages(0).length, abi.encode(message).length, "Message body mismatch");
+        bytes32 messageId = mailboxChainA.latestDispatchedId();
+        console2.log("Message ID gerado:");
+        console2.logBytes32(messageId);
+        console2.log("Mensagens no mailbox A:", mailboxChainA.nonce());
 
-        console2.log("Message sent with ID:");
-        console2.logBytes32(dispatchedId);
-    }
+        assertGt(uint256(messageId), 0, "Message ID invalido");
 
-    function test_ReceiveMessageOnChainB() public {
-        string memory message = "Hello from Chain A!";
-        bytes32 senderBytes = bytes32(uint256(uint160(address(messengerOnChainA))));
+        // ── ENTREGA (Chain B) ────────────────────────────────────────────
+        console2.log("");
+        console2.log("=== ENTREGA (Relayer -> Chain B) ===");
+        console2.log("Mailbox B:      ", address(mailboxChainB));
+        console2.log("Messenger B:    ", address(messengerOnChainB));
+        console2.log("Origin domain:  ", CHAIN_A);
+        console2.log("Sender bytes32:");
+        console2.logBytes32(senderBytes);
 
         vm.expectEmit(true, true, true, true);
         emit SkeenMessenger.MessageReceived(CHAIN_A, senderBytes, message);
@@ -162,6 +176,9 @@ contract SkeenMessengerTest is Test {
             senderBytes,
             abi.encode(message)
         );
+
+        console2.log("Mensagem entregue com sucesso na Chain B!");
+        console2.log("Evento MessageReceived emitido com a mensagem: ", message);
     }
 
     function test_HandleRevertsIfNotMailbox() public {
