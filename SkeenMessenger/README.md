@@ -82,6 +82,10 @@ forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
 
 ```bash
 forge test -v
+
+#### ou
+
+ forge test --match-test test_FullMessageFlowAtoB -vvv
 ```
 
 ---
