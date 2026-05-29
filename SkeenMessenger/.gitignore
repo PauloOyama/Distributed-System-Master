@@ -2,6 +2,10 @@
 cache/
 out/
 
+lib/*
+out/*
+cache/*
+
 # Commonly ignored directories
 .logs/
 .ignore/
