@@ -25,6 +25,16 @@ contract SkeenMessenger is IMessageRecipient {
         owner = msg.sender;
     }
 
+    function quoteDispatch(
+        uint32 _destinationDomain,
+        address _recipient,
+        string calldata _message
+    ) external view returns (uint256) {
+        bytes memory encodedMessage = abi.encode(msg.sender, nextOutgoingNonce[msg.sender] + 1, _message);
+        bytes32 recipient = bytes32(uint256(uint160(_recipient)));
+        return mailbox.quoteDispatch(_destinationDomain, recipient, encodedMessage);
+    }
+
     function sendMessage(
         uint32 _destinationDomain,
         address _recipient,

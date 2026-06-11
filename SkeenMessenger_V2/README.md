@@ -235,3 +235,129 @@ cast balance 0x... --rpc-url $RPC_URL
 # Enviar transação
 cast send --private-key $PRIVATE_KEY --rpc-url $RPC_URL ...
 ```
+
+---
+
+## Semana 2: Buffer FIFO e Integração com Hyperlane Test Kit
+
+### Por que foi implementado
+
+A internet não é confiável. Em sistemas distribuídos, mensagens cross-chain podem chegar fora de ordem — o relayer pode entregar a mensagem 3 antes da mensagem 1. Se isso acontecer sem tratamento, o algoritmo de Skeen perde a garantia de **Ordem Total**.
+
+Para resolver isso, foram adicionadas duas camadas:
+
+1. **Nonce no emissor** — cada mensagem carrega um número de sequência (`nonce`) embutido no payload, junto com o endereço do remetente original.
+2. **Buffer FIFO no receptor** — mensagens que chegam adiantadas ficam em espera. Quando a mensagem esperada chega, ela é processada e o buffer é esvaziado em cascata.
+
+Além disso, o `MockMailbox` simplificado foi substituído pelos **contratos oficiais de teste do Hyperlane** (`TestMailbox`, `TestIsm`, `TestPostDispatchHook`), que reproduzem o comportamento real do protocolo sem precisar de uma rede ao vivo.
+
+---
+
+### O que mudou no contrato (`SkeenMessenger.sol`)
+
+| Adição | Descrição |
+|--------|-----------|
+| `nextOutgoingNonce` | Mapping `address => uint256` que incrementa a cada envio |
+| Payload com nonce | `abi.encode(msg.sender, nonce, message)` em vez de só `abi.encode(message)` |
+| `nextExpectedNonce` | Rastreia o próximo nonce esperado por `(origin, senderKey)` |
+| `_buffer` | Armazena mensagens adiantadas até a vez delas chegar |
+| Flush em cascata | Após processar a mensagem esperada, esvazia o buffer automaticamente |
+| `quoteDispatch()` | Consulta o custo de envio no mailbox, habilitando o padrão `{value: fee}` |
+
+---
+
+### Por que usar o Hyperlane Test Kit em vez do MockMailbox
+
+| MockMailbox (Semana 1) | TestMailbox oficial (Semana 2) |
+|------------------------|-------------------------------|
+| Implementação manual e simplificada | Contrato real do Hyperlane |
+| `deliverMessage()` chama `handle()` diretamente | `process()` verifica ISM, emite eventos reais e chama `handle()` |
+| Sem verificação de ISM | Usa `TestIsm` (sempre aprova) |
+| Sem hooks de gas | Usa `TestPostDispatchHook` (fee = 0) |
+| Não testa o fluxo real do protocolo | Testa o mesmo caminho que acontece em produção |
+
+O `TestMailbox` herda do `Mailbox.sol` real. Isso significa que `process()` executa toda a lógica de verificação, emissão de eventos e entrega — exatamente como na mainnet.
+
+---
+
+### Como o Teste do Caos funciona (`SkeenMessengerChaos.t.sol`)
+
+O teste simula um relayer malicioso ou com falha de rede que entrega as mensagens fora de ordem:
+
+```
+Envio (Chain A):   M1 (nonce=1) → M2 (nonce=2) → M3 (nonce=3)
+
+Entrega (Chain B): M3 → buffer
+                   M2 → buffer
+                   M1 → processa M1, depois flush automático: M2, M3
+```
+
+Resultado esperado: os três eventos `MessageReceived` são emitidos na ordem M1 → M2 → M3, e `nextExpectedNonce == 3`.
+
+#### Componentes usados
+
+```solidity
+TestIsm  ism  = new TestIsm();               // ISM que sempre retorna verify() = true
+TestPostDispatchHook hook = new TestPostDispatchHook(); // hook sem custo (fee = 0)
+
+TestMailbox mailboxA = new TestMailbox(CHAIN_A);
+mailboxA.initialize(owner, address(ism), address(hook), address(hook));
+
+// buildInboundMessage() monta o pacote Hyperlane formatado
+bytes memory msg = mailboxB.buildInboundMessage(origin, recipient, sender, body);
+
+// process() entrega a mensagem pelo caminho real do protocolo
+mailboxB.process("", msg);
+```
+
+---
+
+### Como executar
+
+**Instalar dependências do OpenZeppelin** (necessário uma vez, já incluído em `lib/`):
+
+```bash
+cd SkeenMessenger_V2/lib
+git clone --depth 1 --branch v4.9.3 https://github.com/OpenZeppelin/openzeppelin-contracts.git
+git clone --depth 1 --branch v4.9.3 https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git
+```
+
+**Compilar:**
+
+```bash
+cd SkeenMessenger_V2
+forge build
+```
+
+**Rodar todos os testes:**
+
+```bash
+forge test -v
+```
+
+**Rodar apenas o Teste do Caos com trace completo:**
+
+```bash
+forge test --match-test test_ChaosOutOfOrderDelivery -vvvv
+```
+
+**Saída esperada:**
+
+```
+[PASS] test_ChaosOutOfOrderDelivery()
+
+Logs:
+  === CHAOS: entregando M3, M2, M1 fora de ordem ===
+  Entregando M3 (nonce=3) -> deve ir para o buffer
+  Entregando M2 (nonce=2) -> deve ir para o buffer
+  Entregando M1 (nonce=1) -> deve processar M1+M2+M3 em cascata
+  SUCESSO: M1, M2 e M3 processadas na ordem correta!
+
+Traces (resumo):
+  SkeenMessenger::handle(nonce=3) → buffered
+  SkeenMessenger::handle(nonce=2) → buffered
+  SkeenMessenger::handle(nonce=1)
+    emit MessageReceived("M1")
+    emit MessageReceived("M2")  ← flush do buffer
+    emit MessageReceived("M3")  ← flush do buffer
+```

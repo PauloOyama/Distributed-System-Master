@@ -55,9 +55,9 @@ Testa contra o estado do Anvil. Block number ainda não muda (testes rodam em fo
 ```bash
 cd SimpleVault
 forge script script/Deploy.s.sol \
-  --rpc-url http://localhost:8545 \
-  --broadcast \
-  --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+  --rpc-url http://localhost:8545 
+  --broadcast 
+  --private-key 0x976EA74026E726554dB657fA54763abd0C3a0aa9
 ```
 
 Realmente modifica o Anvil. Block number aumenta.

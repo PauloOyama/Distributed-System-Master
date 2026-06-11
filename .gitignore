@@ -1,7 +1,8 @@
 # Compiler files
 cache/
 out/
-
+node_modules/**
+*/out/*
 # Commonly ignored directories
 .logs/
 .ignore/
