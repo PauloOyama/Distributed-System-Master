@@ -265,3 +265,40 @@ cast call 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512 \
 ```
 
 > O valor retornado é o último nonce processado em ordem. `0` significa que nenhuma mensagem foi entregue ainda.
+
+---
+
+## Decodificando a mensagem recebida (hex → texto)
+
+O `cast logs` retorna o campo `data` em hexadecimal. A mensagem de texto fica no **último bloco de 32 bytes** do `data`.
+
+Exemplo de `data` real:
+
+```
+000000000000000000000000c6e7df5e7b4f2a278906862b61205850344d4e7d  ← sender (address)
+0000000000000000000000000000000000000000000000000000000000000040  ← offset do string
+0000000000000000000000000000000000000000000000000000000000000010  ← tamanho em bytes (0x10 = 16)
+68656c6c6f2066726f6d205041554c4f00000000000000000000000000000000  ← conteúdo da mensagem ← esse
+```
+
+**Como extrair o texto:**
+
+1. Leia o tamanho (`0x10` = 16 bytes → 32 caracteres hex)
+2. Pegue os primeiros `tamanho * 2` caracteres do último bloco
+3. Converta com `cast --to-ascii`:
+
+```bash
+cast --to-ascii 68656c6c6f2066726f6d205041554c4f
+# hello from PAULO
+```
+
+**Tabela de referência rápida:**
+
+| Bloco no `data` | Conteúdo |
+|---|---|
+| 1º (32 bytes) | `sender` — endereço do SkeenMessenger emissor |
+| 2º (32 bytes) | offset do string (sempre `0x40` = 64) |
+| 3º (32 bytes) | tamanho do string em bytes |
+| 4º (32 bytes) | conteúdo da mensagem em ASCII/hex |
+
+> **Atenção ao erro RPC na Chain A:** O Relayer tenta chamar `recipientIsm()` no contrato para descobrir qual ISM usar. Como o `SkeenMessenger` não implementa essa função, a call reverte com `execution reverted`. Isso é **inofensivo** — o Relayer usa o ISM padrão da Mailbox e entrega a mensagem normalmente.
