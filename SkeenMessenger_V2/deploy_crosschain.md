@@ -98,7 +98,7 @@ Na versão 35.x do CLI, o config é um objeto flat (sem chave de chain). Gere co
 hyperlane core init
 ```
 
-Quando perguntado pelo owner, use `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`. O comando cria `./configs/core-config.yaml`:
+Quando perguntado pelo owner e beneficiary, use `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`. O comando cria `./configs/core-config.yaml`:
 
 ```yaml
 defaultHook:
@@ -156,9 +156,9 @@ O campo relevante em cada arquivo é `mailbox`.
 ```bash
 export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
-# Lê os endereços gerados pelo core deploy
-MAILBOX_A=$(grep 'mailbox:' ~/.hyperlane/chains/anvil1/addresses.yaml | awk '{print $2}')
-MAILBOX_B=$(grep 'mailbox:' ~/.hyperlane/chains/anvil2/addresses.yaml | awk '{print $2}')
+# Lê os endereços gerados pelo core deploy (remove aspas extras do yaml)
+export MAILBOX_A=$(grep 'mailbox:' ~/.hyperlane/chains/anvil1/addresses.yaml | awk '{print $2}' | tr -d '"')
+export MAILBOX_B=$(grep 'mailbox:' ~/.hyperlane/chains/anvil2/addresses.yaml | awk '{print $2}' | tr -d '"')
 
 # Deploy na chain A
 MAILBOX_ADDRESS=$MAILBOX_A forge script script/Deploy.s.sol \
@@ -173,20 +173,59 @@ MAILBOX_ADDRESS=$MAILBOX_B forge script script/Deploy.s.sol \
   --private-key $PRIVATE_KEY
 ```
 
-Anote os endereços do `SkeenMessenger` impressos no output do `forge script` — você precisará deles para chamar `sendMessage`.
+Verifique os endereços deployados:
+```bash
+# Chain A (chainId 31337)
+cat broadcast/Deploy.s.sol/31337/run-latest.json | grep contractAddress
+
+# Chain B (chainId 31338)
+cat broadcast/Deploy.s.sol/31338/run-latest.json | grep contractAddress
+```
 
 ---
 
 ## Passo 7 — Rodar o Relayer
 
-Para que mensagens enviadas na chain A cheguem na chain B:
+Para que mensagens enviadas na chain A cheguem na chain B, passe as chains separadas:
 
 ```bash
 hyperlane relayer \
-  --relayChains anvil1,anvil2 \
+  --chains anvil1 \
+  --chains anvil2 \
   --registry ~/.hyperlane \
-  --defaultSigner.key $HYP_KEY
+  --key $HYP_KEY
 ```
+
+Deixe esse terminal aberto.
+
+---
+
+## Passo 8 — Testar envio de mensagem
+
+Envie uma mensagem de anvil1 para anvil2 (substitua os endereços pelos do seu deploy):
+
+```bash
+cast send <SKEEN_MESSENGER_ANVIL1> \
+  "sendMessage(uint32,address,string)" \
+  31338 \
+  <SKEEN_MESSENGER_ANVIL2> \
+  "hello from anvil1" \
+  --rpc-url http://localhost:8545 \
+  --private-key $PRIVATE_KEY
+```
+
+> **Nota:** Não use `--value` — o `merkleTreeHook` não aceita ETH.
+
+Verifique se a mensagem foi entregue na chain B:
+
+```bash
+cast logs \
+  --rpc-url http://localhost:8546 \
+  --address <SKEEN_MESSENGER_ANVIL2> \
+  --from-block 0
+```
+
+O log deve conter o texto da mensagem codificado em hex no campo `data`. Por exemplo, `"hello from anvil1"` aparece como `68656c6c6f2066726f6d20616e76696c31`.
 
 ---
 
@@ -198,5 +237,7 @@ hyperlane relayer \
 | Gerar config | `hyperlane core init` |
 | Deploy core (por chain) | `hyperlane core deploy --chain anvil1 ...` |
 | Deploy contrato | `forge script script/Deploy.s.sol --broadcast ...` |
-| Rodar relayer | `hyperlane relayer --relayChains anvil1,anvil2 ...` |
+| Rodar relayer | `hyperlane relayer --chains anvil1 --chains anvil2 ...` |
+| Enviar mensagem | `cast send <addr> "sendMessage(uint32,address,string)" ...` |
+| Ver mensagens recebidas | `cast logs --rpc-url http://localhost:8546 --address <addr> --from-block 0` |
 | Ver endereços deployados | `cat ~/.hyperlane/chains/anvil1/addresses.yaml` |
