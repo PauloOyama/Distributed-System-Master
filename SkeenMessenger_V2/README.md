@@ -57,7 +57,7 @@ forge build
 anvil
 
 # Terminal 2: Faça deploy
-export PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb476cadeee4c811dac45ba720b85"
+export PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 export MAILBOX_ADDRESS="0x0000000000000000000000000000000000000000"
 
 forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast

@@ -241,3 +241,27 @@ O log deve conter o texto da mensagem codificado em hex no campo `data`. Por exe
 | Enviar mensagem | `cast send <addr> "sendMessage(uint32,address,string)" ...` |
 | Ver mensagens recebidas | `cast logs --rpc-url http://localhost:8546 --address <addr> --from-block 0` |
 | Ver endereços deployados | `cat ~/.hyperlane/chains/anvil1/addresses.yaml` |
+| Ver timestamp do bloco atual | `cast block latest --field timestamp --rpc-url http://localhost:8546` |
+| Ver nextExpectedNonce | `cast call <SKEEN_B> "nextExpectedNonce(uint32,bytes32)(uint256)" <DOMAIN_A> 0x000000000000000000000000<SKEEN_A_sem_0x> --rpc-url http://localhost:8546` |
+| Ver nextExpectedNonce (exemplo real) | ver seção abaixo |
+
+---
+
+## Consultando nextExpectedNonce
+
+O mapping usa `bytes32` como chave (não `address`), então o endereço deve ser convertido para `bytes32` com padding de 12 bytes de zero à esquerda.
+
+**Formato:** `0x000000000000000000000000` + endereço sem o `0x`
+
+Exemplo com os endereços locais (ambas as chains deployadas em `0xe7f1725e7734ce288f8367e1bb143e90bb3f0512`):
+
+```bash
+# Consulta na rede B (8546): quantas mensagens da rede A (domain 31337) já foram processadas em ordem
+cast call 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512 \
+  "nextExpectedNonce(uint32,bytes32)(uint256)" \
+  31337 \
+  0x000000000000000000000000e7f1725e7734ce288f8367e1bb143e90bb3f0512 \
+  --rpc-url http://localhost:8546
+```
+
+> O valor retornado é o último nonce processado em ordem. `0` significa que nenhuma mensagem foi entregue ainda.
