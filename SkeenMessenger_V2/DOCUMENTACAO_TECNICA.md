@@ -56,7 +56,7 @@ A combinação resulta em um sistema onde:
 |---|---|
 | **Anvil** | Blockchain Ethereum local (Foundry). Expõe API JSON-RPC em `localhost:PORTA` |
 | **Mailbox** | Contrato Hyperlane que gerencia envio (`dispatch`) e recebimento (`process`) de mensagens cross-chain |
-| **ISM** | *Interchain Security Module* — módulo que verifica a autenticidade de uma mensagem antes de entregá-la |
+| **ISM** | *Interchain Security Module* — contrato na chain de **destino** que responde a pergunta: *"posso confiar nessa mensagem?"*. O Relayer chama `verify()` no ISM antes de entregar. Se retornar `false`, a mensagem é rejeitada. Em ambiente local usamos o `TrustedRelayerIsm`, que aprova qualquer mensagem entregue pelo endereço do Relayer configurado. Em produção existem ISMs com verificação de assinatura de validadores (multisig), provas de Merkle e zero-knowledge |
 | **Hook** | Contrato que executa ações pós-envio (ex: inserir folha em Merkle Tree, cobrar taxa) |
 | **Relayer** | Processo off-chain que monitora eventos na chain de origem e entrega mensagens na chain de destino |
 | **SkeenMessenger** | Contrato de aplicação que implementa envio com nonce e recebimento com buffer FIFO |

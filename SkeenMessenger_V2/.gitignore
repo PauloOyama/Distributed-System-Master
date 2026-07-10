@@ -22,3 +22,5 @@ docs/
 
 # Kiro
 .kiro/
+*.pdf
+broadcast/**

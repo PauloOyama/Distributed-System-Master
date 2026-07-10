@@ -3,10 +3,15 @@ pragma solidity ^0.8.0;
 
 import {IMessageRecipient} from "@hyperlane-xyz/core/interfaces/IMessageRecipient.sol";
 import {IMailbox} from "@hyperlane-xyz/core/interfaces/IMailbox.sol";
+import {IInterchainSecurityModule} from "@hyperlane-xyz/core/interfaces/IInterchainSecurityModule.sol";
 
 contract SkeenMessenger is IMessageRecipient {
     IMailbox public mailbox;
     address public owner;
+
+    // Maximum number of nonces ahead of the expected that will be buffered.
+    // A message with nonce > expected + WINDOW_SIZE is rejected as potential spam.
+    uint256 public constant WINDOW_SIZE = 10;
 
     // Sender side: nonce per sender address
     mapping(address => uint256) public nextOutgoingNonce;
@@ -23,6 +28,12 @@ contract SkeenMessenger is IMessageRecipient {
     constructor(address _mailbox) {
         mailbox = IMailbox(_mailbox);
         owner = msg.sender;
+    }
+
+    // Tells the relayer which ISM to use for this contract.
+    // Returns the mailbox default ISM, eliminating the "Invalid response from provider" warning.
+    function interchainSecurityModule() external view returns (IInterchainSecurityModule) {
+        return IInterchainSecurityModule(mailbox.defaultIsm());
     }
 
     function quoteDispatch(
@@ -61,6 +72,12 @@ contract SkeenMessenger is IMessageRecipient {
 
         bytes32 senderKey = bytes32(uint256(uint160(originalSender)));
         uint256 expected = nextExpectedNonce[_origin][senderKey];
+
+        // Anti-DoS: reject messages whose nonce is too far ahead of the window
+        require(
+            nonce <= expected + WINDOW_SIZE,
+            "Nonce muito a frente da janela esperada (Possivel Spam)"
+        );
 
         if (nonce == expected + 1) {
             // Deliver in order
