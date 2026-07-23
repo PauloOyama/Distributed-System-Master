@@ -20,7 +20,9 @@ docs/
 .env.*
 !.env.example
 
-# Kiro
+
 .kiro/
 *.pdf
 broadcast/**
+
+example.sol
