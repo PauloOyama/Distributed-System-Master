@@ -1,10 +1,7 @@
 # Compiler files
 cache/
 out/
-
 lib/*
-out/*
-cache/*
 
 # Commonly ignored directories
 .logs/
@@ -23,5 +20,9 @@ docs/
 .env.*
 !.env.example
 
-# Kiro
+
 .kiro/
+*.pdf
+broadcast/**
+
+example.sol

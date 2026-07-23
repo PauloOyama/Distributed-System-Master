@@ -5,5 +5,7 @@ libs = ["lib"]
 remappings = [
     "@hyperlane-xyz/core/=lib/hyperlane-monorepo/solidity/contracts/",
     "@hyperlane-xyz/=lib/hyperlane-monorepo/solidity/",
-    "forge-std/=lib/forge-std/src/"
+    "forge-std/=lib/forge-std/src/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
 ]

@@ -167,14 +167,14 @@ contract SkeenMessengerTest is Test {
         console2.log("Sender bytes32:");
         console2.logBytes32(senderBytes);
 
-        // vm.expectEmit(true, true, true, true);
+        vm.expectEmit(true, true, true, true);
         emit SkeenMessenger.MessageReceived(CHAIN_A, senderBytes, message);
 
         mailboxChainB.deliverMessage(
             address(messengerOnChainB),
             CHAIN_A,
             senderBytes,
-            abi.encode(message)
+            abi.encode(SENDER, uint256(1), message)
         );
 
         console2.log("Mensagem entregue com sucesso na Chain B!");

@@ -1,6 +1,0 @@
-[submodule "SkeenMessenger/lib/hyperlane-monorepo"]
-	path = SkeenMessenger/lib/hyperlane-monorepo
-	url = https://github.com/hyperlane-xyz/hyperlane-monorepo.git
-[submodule "SkeenMessenger/lib/forge-std"]
-	path = SkeenMessenger/lib/forge-std
-	url = https://github.com/foundry-rs/forge-std
