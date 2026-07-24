@@ -123,7 +123,7 @@ contract SkeenAMC is IMessageRecipient {
             abi.decode(_message, (Phase, bytes32, bytes));
 
         if (phase == Phase.START) {
-            // _onStart(txnId, _origin, payload);
+            _onStart(txnId, _origin, payload);
         } else if (phase == Phase.LOCAL_TS) {
             // _onLocalTs(txnId, _origin, payload);
         } else if (phase == Phase.FINAL) {
@@ -133,9 +133,44 @@ contract SkeenAMC is IMessageRecipient {
         }
     }
 
+    
+    // =========================================================================
+    // Rodadas
+    // =========================================================================
+    
+        /// @dev Rodada 1 — START recebido.
+    ///      Incrementa o globalClock, atribui timestamp local e envia LOCAL_TS para todos.
+    function _onStart(bytes32 _txnId, uint32 _origin, bytes memory _payload) internal {
+        (, , uint32[] memory destinations, ) =
+            abi.decode(_payload, (bytes32, bytes, uint32[], uint8));
+
+        TxnState storage t = txns[_txnId];
+
+        // Inicializar estado se ainda não existe (chain destino recebendo START)
+        if (t.txnId == bytes32(0)) {
+            t.txnId        = _txnId;
+            t.destinations = destinations;
+        }
+
+        // Rodada 2a: atribuir timestamp local
+        globalClock++;
+        uint256 localTs = globalClock;
+
+        t.phase = Phase.LOCAL_TS;
+        emit PhaseAdvanced(_txnId, Phase.LOCAL_TS);
+        emit LocalTsAssigned(_txnId, _origin, localTs, t.responseCount + 1);
+
+        // Propagar LOCAL_TS para todas as chains (incluindo esta)
+        bytes memory localTsPayload = abi.encode(_txnId, localTs, destinations);
+        for (uint256 i = 0; i < destinations.length; i++) {
+            _sendProtocolMessage(destinations[i], Phase.LOCAL_TS, localTsPayload);
+        }
+    }
+
     // =========================================================================
     // Utils
     // =========================================================================
+
 
 
     /// @dev Envia uma mensagem de protocolo via SkeenMessenger.
