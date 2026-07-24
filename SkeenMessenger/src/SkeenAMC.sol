@@ -70,14 +70,14 @@ contract SkeenAMC is IMessageRecipient {
         mailbox   = _mailbox;
     }
 
-
+    //TODO: FAZER TESTES 
     // =========================================================================
     // Funções
     // =========================================================================
     /// @notice Inicia o protocolo de Skeen para uma transação multicast.
     /// @param _txnData   Dados da transação (payload serializado)
     /// @param _destinations Array de domain IDs das chains participantes
-    /// @param _mode      Cooperative (sem escrow) ou Adversarial (com escrow)
+    /// @param _mode      Cooperative (sem escrow) ou Adversarisal (com escrow)
     function multicast(
         bytes calldata _txnData,
         uint32[] calldata _destinations,
