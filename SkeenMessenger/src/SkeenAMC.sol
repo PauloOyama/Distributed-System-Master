@@ -70,10 +70,10 @@ contract SkeenAMC is IMessageRecipient {
         mailbox   = _mailbox;
     }
 
+
     // =========================================================================
     // Funções
     // =========================================================================
-
     /// @notice Inicia o protocolo de Skeen para uma transação multicast.
     /// @param _txnData   Dados da transação (payload serializado)
     /// @param _destinations Array de domain IDs das chains participantes
@@ -110,6 +110,34 @@ contract SkeenAMC is IMessageRecipient {
     }
 
 
+    /// @notice Ponto de entrada de todas as mensagens cross-chain (Hyperlane handle).
+    ///         Somente o Mailbox pode chamar esta função (SR-01).
+    function handle(
+        uint32 _origin,
+        bytes32 /*_sender*/,
+        bytes calldata _message
+    ) external payable {
+        require(msg.sender == mailbox, "SkeenAMC: apenas o Mailbox pode chamar handle");
+
+        (Phase phase, bytes32 txnId, bytes memory payload) =
+            abi.decode(_message, (Phase, bytes32, bytes));
+
+        if (phase == Phase.START) {
+            // _onStart(txnId, _origin, payload);
+        } else if (phase == Phase.LOCAL_TS) {
+            // _onLocalTs(txnId, _origin, payload);
+        } else if (phase == Phase.FINAL) {
+            // _onFinal(txnId, _origin, payload);
+        } else if (phase == Phase.ACK) {
+            // _onAck(txnId, _origin, payload);
+        }
+    }
+
+    // =========================================================================
+    // Utils
+    // =========================================================================
+
+
     /// @dev Envia uma mensagem de protocolo via SkeenMessenger.
     function _sendProtocolMessage(
         uint32 _dest,
@@ -128,7 +156,7 @@ contract SkeenAMC is IMessageRecipient {
             string(message)
         );
     }
-    
+
     /// @dev Custódia de ativos no modo Adversarial (stub para extensão futura).
     function _escrowAssets(bytes calldata /*_txnData*/) internal {
         // Decodificar operações e chamar transferFrom
