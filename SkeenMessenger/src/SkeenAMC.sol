@@ -39,7 +39,7 @@ contract SkeenAMC is IMessageRecipient {
     //=====
     //Emissões
     //=====
-    
+
      /// @notice Emitido quando multicast() é chamado (início do protocolo)
     event TxnStarted(bytes32 indexed txnId, uint32[] destinations, uint256 timestamp);
 
@@ -60,4 +60,79 @@ contract SkeenAMC is IMessageRecipient {
 
     /// @notice Emitido quando a transação é entregue (após todos os ACKs)
     event TxnDelivered(bytes32 indexed txnId, uint256 finalTs);
+
+    // =========================================================================
+    // Construtor
+    // =========================================================================
+
+    constructor(address _messenger, address _mailbox) {
+        messenger = SkeenMessenger(payable(_messenger));
+        mailbox   = _mailbox;
+    }
+
+    // =========================================================================
+    // Funções
+    // =========================================================================
+
+    /// @notice Inicia o protocolo de Skeen para uma transação multicast.
+    /// @param _txnData   Dados da transação (payload serializado)
+    /// @param _destinations Array de domain IDs das chains participantes
+    /// @param _mode      Cooperative (sem escrow) ou Adversarial (com escrow)
+    function multicast(
+        bytes calldata _txnData,
+        uint32[] calldata _destinations,
+        Mode _mode
+    ) external payable {
+        require(_destinations.length >= 2, "Requer ao menos 2 destinations");
+
+        bytes32 txnId = keccak256(_txnData);
+        require(!txns[txnId].delivered, "Transacao ja entregue");
+        require(txns[txnId].txnId == bytes32(0), "Transacao ja iniciada");
+
+        TxnState storage t = txns[txnId];
+        t.txnId       = txnId;
+        t.phase       = Phase.START;
+        t.destinations = _destinations;
+
+        // Modo Adversarial: puxar ativos para escrow antes de propagar
+        if (_mode == Mode.Adversarial) {
+            _escrowAssets(_txnData);
+        }
+
+        // Envia START para todas as chains de destino
+        bytes memory payload = abi.encode(txnId, _txnData, _destinations, uint8(_mode));
+        for (uint256 i = 0; i < _destinations.length; i++) {
+            _sendProtocolMessage(_destinations[i], Phase.START, payload);
+        }
+
+        emit TxnStarted(txnId, _destinations, block.timestamp);
+        emit PhaseAdvanced(txnId, Phase.START);
+    }
+
+
+    /// @dev Envia uma mensagem de protocolo via SkeenMessenger.
+    function _sendProtocolMessage(
+        uint32 _dest,
+        Phase _phase,
+        bytes memory _payload
+    ) internal {
+        bytes memory message = abi.encode(_phase, _payload);
+        uint256 fee = messenger.mailbox().quoteDispatch(
+            _dest,
+            bytes32(uint256(uint160(address(this)))),
+            message
+        );
+        messenger.sendMessage{value: fee}(
+            _dest,
+            address(this),
+            string(message)
+        );
+    }
+    
+    /// @dev Custódia de ativos no modo Adversarial (stub para extensão futura).
+    function _escrowAssets(bytes calldata /*_txnData*/) internal {
+        // Decodificar operações e chamar transferFrom
+        // Implementação específica do caso de uso (ex: ERC-20 lockup)
+    }
+
 }
