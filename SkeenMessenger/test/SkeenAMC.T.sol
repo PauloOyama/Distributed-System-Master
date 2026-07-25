@@ -147,4 +147,15 @@ contract SkeenAMCTest is Test {
         console2.log("[START] Dispatches realizados:", mailboxA.nonce());
     }
 
+    function test_StartPhase_RevertOnDuplicate() public {
+        console2.log("=== test_StartPhase_RevertOnDuplicate ===");
+
+        vm.prank(CALLER);
+        amcA.multicast(txnData, destinations, SkeenAMC.Mode.Cooperative);
+
+        vm.prank(CALLER);
+        vm.expectRevert("Transacao ja iniciada");
+        amcA.multicast(txnData, destinations, SkeenAMC.Mode.Cooperative);
+        console2.log("[START] Revert em duplicata: OK");
+    }
 }
