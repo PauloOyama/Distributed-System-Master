@@ -198,4 +198,10 @@ contract SkeenAMC is IMessageRecipient {
         // Implementação específica do caso de uso (ex: ERC-20 lockup)
     }
 
+    /// @notice Retorna a fase atual de uma transação
+    function getPhase(bytes32 _txnId) external view returns (Phase) {
+        return txns[_txnId].phase;
+    }
+
+
 }
