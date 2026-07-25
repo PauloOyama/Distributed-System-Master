@@ -66,3 +66,72 @@ contract MockMailboxAMC is IMailbox {
         require(ok, "MockMailboxAMC: delivery failed");
     }
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Suite de testes do SkeenAMC
+// ─────────────────────────────────────────────────────────────────────────────
+contract SkeenAMCTest is Test {
+
+    uint32 constant CHAIN_A = 31337;
+    uint32 constant CHAIN_B = 31338;
+    address constant CALLER = address(0xCAFE);
+
+    MockMailboxAMC mailboxA;
+    MockMailboxAMC mailboxB;
+    SkeenMessenger messengerA;
+    SkeenMessenger messengerB;
+    SkeenAMC amcA;
+    SkeenAMC amcB;
+
+    uint32[] destinations;
+    bytes txnData;
+    bytes32 txnId;
+
+    function setUp() public {
+        // Criar mailboxes mock
+        mailboxA = new MockMailboxAMC(CHAIN_A);
+        mailboxB = new MockMailboxAMC(CHAIN_B);
+
+        // Criar messengers
+        messengerA = new SkeenMessenger(address(mailboxA));
+        messengerB = new SkeenMessenger(address(mailboxB));
+
+        // Criar AMCs — mailbox é quem chama handle()
+        amcA = new SkeenAMC(address(messengerA), address(mailboxA));
+        amcB = new SkeenAMC(address(messengerB), address(mailboxB));
+
+        // Dados padrão de teste
+        destinations = new uint32[](2);
+        destinations[0] = CHAIN_A;
+        destinations[1] = CHAIN_B;
+
+        txnData = abi.encode("test-transaction", uint256(42));
+        txnId   =  keccak256(txnData);
+        
+    }
+
+// =========================================================================
+    // RODADA 1: START
+    // =========================================================================
+
+    function test_StartPhase_MulticastEmitsEvents() public {
+        console2.log("=== test_StartPhase_MulticastEmitsEvents ===");
+
+        vm.expectEmit(true, false, false, true);
+        emit SkeenAMC.TxnStarted(txnId, destinations, block.timestamp);
+
+        vm.expectEmit(true, false, false, true);
+        emit SkeenAMC.PhaseAdvanced(txnId, SkeenAMC.Phase.START);
+
+        vm.prank(CALLER);
+        amcA.multicast(txnData, destinations, SkeenAMC.Mode.Cooperative);
+
+        // console2.log("[txnId] ---> ", txnId);
+        assertEq(uint8(amcA.getPhase(txnId)), uint8(SkeenAMC.Phase.START));
+        console2.log("[START] txnId phase:", uint8(amcA.getPhase(txnId)));
+        // console2.log("[START] txnId phase:", amcA.getPhase(txnId));
+        console2.log("[START] Mensagens dispatch no Mailbox A:", mailboxA.nonce());
+    }
+
+}
