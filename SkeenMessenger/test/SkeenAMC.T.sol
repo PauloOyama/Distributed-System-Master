@@ -158,4 +158,14 @@ contract SkeenAMCTest is Test {
         amcA.multicast(txnData, destinations, SkeenAMC.Mode.Cooperative);
         console2.log("[START] Revert em duplicata: OK");
     }
+
+    function test_StartPhase_RevertOnSingleDestination() public {
+        uint32[] memory single = new uint32[](1);
+        single[0] = CHAIN_A;
+
+        vm.expectRevert("Requer ao menos 2 destinations");
+        vm.prank(CALLER);
+        amcA.multicast(txnData, single, SkeenAMC.Mode.Cooperative);
+    }
+
 }
