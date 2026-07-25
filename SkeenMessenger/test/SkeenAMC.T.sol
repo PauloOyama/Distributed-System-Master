@@ -134,4 +134,17 @@ contract SkeenAMCTest is Test {
         console2.log("[START] Mensagens dispatch no Mailbox A:", mailboxA.nonce());
     }
 
+
+    function test_StartPhase_DispatchesMsgToAllDestinations() public {
+        console2.log("=== test_StartPhase_DispatchesMsgToAllDestinations ===");
+
+        vm.prank(CALLER);
+        amcA.multicast(txnData, destinations, SkeenAMC.Mode.Cooperative);
+
+        // Cada destino recebe uma mensagem START
+        assertEq(mailboxA.nonce(), uint32(destinations.length),
+            "Mailbox deve ter dispatch para cada destino");
+        console2.log("[START] Dispatches realizados:", mailboxA.nonce());
+    }
+
 }
