@@ -125,7 +125,7 @@ contract SkeenAMC is IMessageRecipient {
         if (phase == Phase.START) {
             _onStart(txnId, _origin, payload);
         } else if (phase == Phase.LOCAL_TS) {
-            // _onLocalTs(txnId, _origin, payload);
+            _onLocalTs(txnId, _origin, payload);
         } else if (phase == Phase.FINAL) {
             // _onFinal(txnId, _origin, payload);
         } else if (phase == Phase.ACK) {
@@ -138,7 +138,7 @@ contract SkeenAMC is IMessageRecipient {
     // Rodadas
     // =========================================================================
     
-        /// @dev Rodada 1 — START recebido.
+    /// @dev Rodada 1 — START recebido.
     ///      Incrementa o globalClock, atribui timestamp local e envia LOCAL_TS para todos.
     function _onStart(bytes32 _txnId, uint32 _origin, bytes memory _payload) internal {
         (, , uint32[] memory destinations, ) =
@@ -166,6 +166,41 @@ contract SkeenAMC is IMessageRecipient {
             _sendProtocolMessage(destinations[i], Phase.LOCAL_TS, localTsPayload);
         }
     }
+
+/// @dev Rodada 2a/2b — LOCAL_TS recebido de uma chain.
+    ///      Coleta timestamps. Quando todos chegarem, calcula max() e envia FINAL.
+    function _onLocalTs(bytes32 _txnId, uint32 _origin, bytes memory _payload) internal {
+        (, uint256 localTs, uint32[] memory destinations) =
+            abi.decode(_payload, (bytes32, uint256, uint32[]));
+
+        TxnState storage t = txns[_txnId];
+
+        // SR-05: evitar LOCAL_TS duplicado da mesma chain
+        require(!t.hasResponded[_origin], "Chain ja respondeu com LOCAL_TS");
+        t.hasResponded[_origin] = true;
+
+        t.localTimestamps.push(localTs);
+        t.responseCount++;
+
+        emit LocalTsAssigned(_txnId, _origin, localTs, t.responseCount);
+
+        // Quando todos os LOCAL_TS chegaram: calcular FINAL
+        if (t.responseCount == destinations.length) {
+            uint256 finalTs = _max(t.localTimestamps);
+            t.finalTimestamp = finalTs;
+            t.phase = Phase.FINAL;
+
+            emit FinalTsCalculated(_txnId, finalTs, destinations.length);
+            emit PhaseAdvanced(_txnId, Phase.FINAL);
+
+            // Distribuir FINAL para todas as chains
+            bytes memory finalPayload = abi.encode(_txnId, finalTs, destinations);
+            for (uint256 i = 0; i < destinations.length; i++) {
+                _sendProtocolMessage(destinations[i], Phase.FINAL, finalPayload);
+            }
+        }
+    }
+
 
     // =========================================================================
     // Utils
