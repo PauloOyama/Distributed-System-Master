@@ -226,6 +226,18 @@ contract SkeenAMC is IMessageRecipient {
             string(message)
         );
     }
+    
+    /// @dev Calcula o máximo de um array de uint256.
+    function _max(uint256[] storage arr) internal view returns (uint256 maxVal) {
+        require(arr.length > 0, "Array vazio");
+        maxVal = arr[0];
+        for (uint256 i = 1; i < arr.length; i++) {
+            if (arr[i] > maxVal) {
+                maxVal = arr[i];
+            }
+        }
+    }
+
 
     /// @dev Custódia de ativos no modo Adversarial (stub para extensão futura).
     function _escrowAssets(bytes calldata /*_txnData*/) internal {
