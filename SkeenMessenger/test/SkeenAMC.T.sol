@@ -168,4 +168,25 @@ contract SkeenAMCTest is Test {
         amcA.multicast(txnData, single, SkeenAMC.Mode.Cooperative);
     }
 
+        // =========================================================================
+    // RODADA 2: LOCAL_TS + FINAL
+    // =========================================================================
+
+    function test_OnStart_IncrementsGlobalClock() public {
+        console2.log("=== test_OnStart_IncrementsGlobalClock ===");
+
+        uint256 clockBefore = amcA.globalClock();
+
+        // Simular o Mailbox entregando START para o AMC A
+        bytes memory payload = abi.encode(txnId, txnData, destinations, uint8(SkeenAMC.Mode.Cooperative));
+        bytes memory message  = abi.encode(SkeenAMC.Phase.START, txnId, payload);
+
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(uint256(uint160(address(amcB)))), message);
+
+        assertEq(amcA.globalClock(), clockBefore + 1, "globalClock deve incrementar");
+        console2.log("[LOCAL_TS] globalClock antes:", clockBefore);
+        console2.log("[LOCAL_TS] globalClock depois:", amcA.globalClock());
+    }
+
 }
