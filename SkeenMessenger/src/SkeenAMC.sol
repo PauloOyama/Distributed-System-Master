@@ -127,7 +127,7 @@ contract SkeenAMC is IMessageRecipient {
         } else if (phase == Phase.LOCAL_TS) {
             _onLocalTs(txnId, _origin, payload);
         } else if (phase == Phase.FINAL) {
-            // _onFinal(txnId, _origin, payload);
+            _onFinal(txnId, _origin, payload);
         } else if (phase == Phase.ACK) {
             // _onAck(txnId, _origin, payload);
         }
@@ -201,6 +201,28 @@ contract SkeenAMC is IMessageRecipient {
         }
     }
 
+/// @dev Rodada 3a — FINAL recebido.
+    ///      Registra o timestamp final e envia ACK para todas as chains.
+    function _onFinal(bytes32 _txnId, uint32 /*_origin*/, bytes memory _payload) internal {
+        (, uint256 finalTs, uint32[] memory destinations) =
+            abi.decode(_payload, (bytes32, uint256, uint32[]));
+
+        TxnState storage t = txns[_txnId];
+        t.finalTimestamp = finalTs;
+        t.phase = Phase.ACK;
+
+        // Obter o domain ID desta chain a partir do messenger
+        uint32 localDomain = messenger.mailbox().localDomain();
+
+        emit AckSent(_txnId, localDomain);
+        emit PhaseAdvanced(_txnId, Phase.ACK);
+
+        // Enviar ACK para todas as chains
+        bytes memory ackPayload = abi.encode(_txnId, localDomain, destinations);
+        for (uint256 i = 0; i < destinations.length; i++) {
+            _sendProtocolMessage(destinations[i], Phase.ACK, ackPayload);
+        }
+    }
 
     // =========================================================================
     // Utils
