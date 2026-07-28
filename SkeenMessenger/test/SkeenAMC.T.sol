@@ -189,4 +189,42 @@ contract SkeenAMCTest is Test {
         console2.log("[LOCAL_TS] globalClock depois:", amcA.globalClock());
     }
 
+    function test_LocalTs_FinalIsMaxOfTwo() public {
+        console2.log("=== test_LocalTs_FinalIsMaxOfTwo ===");
+
+        // Inicializar a txn no AMC A
+        vm.prank(CALLER);
+        amcA.multicast(txnData, destinations, SkeenAMC.Mode.Cooperative);
+
+        // Simular recebimento do START (Rodada 1 → Rodada 2a)
+        bytes memory startPayload = abi.encode(txnId, txnData, destinations, uint8(SkeenAMC.Mode.Cooperative));
+        bytes memory startMsg     = abi.encode(SkeenAMC.Phase.START, txnId, startPayload);
+
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_A, bytes32(uint256(uint160(address(amcA)))), startMsg);
+        uint256 ts1 = amcA.globalClock(); // timestamp atribuído pela chain A
+
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(uint256(uint160(address(amcB)))), startMsg);
+        // A segunda chamada de _onStart incrementa novamente o clock — simula chain B
+
+        // Simular recebimento de LOCAL_TS da chain A (ts1) e da chain B (ts1+1)
+        uint256 ts2 = ts1 + 5; // chain B tem clock maior
+        // Receber LOCAL_TS da chain A
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_A, bytes32(uint256(uint160(address(amcA)))),
+            abi.encode(SkeenAMC.Phase.LOCAL_TS, txnId, abi.encode(txnId, ts1, destinations)));
+
+        // Receber LOCAL_TS da chain B (dispara cálculo do FINAL)
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(uint256(uint160(address(amcB)))),
+            abi.encode(SkeenAMC.Phase.LOCAL_TS, txnId, abi.encode(txnId, ts2, destinations)));
+
+        assertEq(amcA.getFinalTimestamp(txnId), ts2,
+            "finalTimestamp deve ser max(ts1, ts2)");
+        console2.log("[FINAL] ts1:", ts1, " ts2:", ts2);
+        console2.log("[FINAL] finalTimestamp:", amcA.getFinalTimestamp(txnId));
+        assertEq(uint8(amcA.getPhase(txnId)), uint8(SkeenAMC.Phase.FINAL));
+    }
+
 }
