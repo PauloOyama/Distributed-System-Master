@@ -227,4 +227,22 @@ contract SkeenAMCTest is Test {
         assertEq(uint8(amcA.getPhase(txnId)), uint8(SkeenAMC.Phase.FINAL));
     }
 
+        function test_LocalTs_NoDuplicateResponseAllowed() public {
+        console2.log("=== test_LocalTs_NoDuplicateResponseAllowed ===");
+
+        bytes memory payload = abi.encode(txnId, uint256(10), destinations);
+
+        // Primeiro LOCAL_TS da chain A — OK
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_A, bytes32(0),
+            abi.encode(SkeenAMC.Phase.LOCAL_TS, txnId, payload));
+
+        // Segundo LOCAL_TS da mesma chain A — deve reverter (SR-05)
+        vm.prank(address(mailboxA));
+        vm.expectRevert("Chain ja respondeu com LOCAL_TS");
+        amcA.handle(CHAIN_A, bytes32(0),
+            abi.encode(SkeenAMC.Phase.LOCAL_TS, txnId, payload));
+        console2.log("[LOCAL_TS] Revert em duplicata: OK");
+    }
+
 }
