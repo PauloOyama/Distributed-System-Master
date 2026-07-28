@@ -228,7 +228,10 @@ contract SkeenAMC is IMessageRecipient {
     // Utils
     // =========================================================================
 
-
+    /// @notice Retorna o timestamp final de uma transação
+    function getFinalTimestamp(bytes32 _txnId) external view returns (uint256) {
+        return txns[_txnId].finalTimestamp;
+    }
 
     /// @dev Envia uma mensagem de protocolo via SkeenMessenger.
     function _sendProtocolMessage(
