@@ -242,8 +242,23 @@ contract SkeenAMC is IMessageRecipient {
 
         // Quando todos os ACKs chegaram: entregar
         if (t.ackCount == destinations.length) {
-            //pass, for now
+            tryDeliver(_txnId);
         }
+    }
+
+        /// @dev Entrega a transação se todas as condições forem satisfeitas (SR-06).
+    function tryDeliver(bytes32 _txnId) internal {
+        TxnState storage t = txns[_txnId];
+
+        require(!t.delivered,           "Transacao ja entregue");
+        require(t.finalTimestamp > 0,   "Timestamp final nao definido");
+        require(t.ackCount == t.destinations.length, "ACKs insuficientes");
+
+        t.delivered = true;
+        t.phase     = Phase.DELIVER;
+
+        emit PhaseAdvanced(_txnId, Phase.DELIVER);
+        emit TxnDelivered(_txnId, t.finalTimestamp);
     }
 
     // =========================================================================
