@@ -129,9 +129,10 @@ contract SkeenAMC is IMessageRecipient {
         } else if (phase == Phase.FINAL) {
             _onFinal(txnId, _origin, payload);
         } else if (phase == Phase.ACK) {
-            // _onAck(txnId, _origin, payload);
+            _onAck(txnId, _origin, payload);
         }
     }
+
 
     
     // =========================================================================
@@ -221,6 +222,27 @@ contract SkeenAMC is IMessageRecipient {
         bytes memory ackPayload = abi.encode(_txnId, localDomain, destinations);
         for (uint256 i = 0; i < destinations.length; i++) {
             _sendProtocolMessage(destinations[i], Phase.ACK, ackPayload);
+        }
+    }
+
+    /// @dev Rodada 3b — ACK recebido de uma chain.
+    ///      Incrementa ackCount. Quando todos chegarem, entrega a transação.
+    function _onAck(bytes32 _txnId, uint32 /*_origin*/, bytes memory _payload) internal {
+        (, uint32 fromChain, uint32[] memory destinations) =
+            abi.decode(_payload, (bytes32, uint32, uint32[]));
+
+        TxnState storage t = txns[_txnId];
+
+        // Evitar ACK duplicado da mesma chain
+        require(!t.hasAcked[fromChain], "Chain ja enviou ACK");
+        t.hasAcked[fromChain] = true;
+        t.ackCount++;
+
+        emit AckReceived(_txnId, fromChain, t.ackCount);
+
+        // Quando todos os ACKs chegaram: entregar
+        if (t.ackCount == destinations.length) {
+            //pass, for now
         }
     }
 
