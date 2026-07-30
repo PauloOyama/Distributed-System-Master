@@ -245,4 +245,48 @@ contract SkeenAMCTest is Test {
         console2.log("[LOCAL_TS] Revert em duplicata: OK");
     }
 
+   // =========================================================================
+    // RODADA 3: ACK + DELIVER
+    // =========================================================================
+
+    function test_FullProtocolFlow_TxnDelivered() public {
+        console2.log("=== test_FullProtocolFlow_TxnDelivered ===");
+        console2.log("[FLOW] Simulando protocolo completo em 2 chains...");
+
+        uint256 finalTs = 42;
+
+        // Simular FINAL recebido pela chain A
+        bytes memory finalPayload = abi.encode(txnId, finalTs, destinations);
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(0),
+            abi.encode(SkeenAMC.Phase.FINAL, txnId, finalPayload));
+        console2.log("[ACK] AckSent emitido pela chain A. Phase:", uint8(amcA.getPhase(txnId)));
+
+        // Simular ACK da chain A chegando
+        bytes memory ackFromA = abi.encode(txnId, CHAIN_A, destinations);
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_A, bytes32(0),
+            abi.encode(SkeenAMC.Phase.ACK, txnId, ackFromA));
+        console2.log("[ACK] ACK de Chain A recebido. ackCount:", amcA.getAckCount(txnId));
+
+        // Simular ACK da chain B chegando — dispara tryDeliver()
+        bytes memory ackFromB = abi.encode(txnId, CHAIN_B, destinations);
+
+        vm.expectEmit(true, false, false, true);
+        emit SkeenAMC.TxnDelivered(txnId, finalTs);
+
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(0),
+            abi.encode(SkeenAMC.Phase.ACK, txnId, ackFromB));
+        console2.log("[ACK] ACK de Chain B recebido. ackCount:", amcA.getAckCount(txnId));
+
+        // Verificações finais
+        assertTrue(amcA.isDelivered(txnId), "Txn deve estar entregue");
+        assertEq(amcA.getFinalTimestamp(txnId), finalTs, "finalTimestamp incorreto");
+        assertEq(uint8(amcA.getPhase(txnId)), uint8(SkeenAMC.Phase.DELIVER));
+
+        console2.log("[DELIVER] isDelivered:", amcA.isDelivered(txnId));
+        console2.log("[DELIVER] finalTimestamp:", amcA.getFinalTimestamp(txnId));
+        console2.log("[DELIVER] SUCESSO: protocolo de Skeen completo em 2 chains!");
+    }
 }
