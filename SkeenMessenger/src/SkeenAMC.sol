@@ -313,4 +313,14 @@ contract SkeenAMC is IMessageRecipient {
     }
 
 
+    /// @notice Retorna o número de ACKs recebidos para uma transação
+    function getAckCount(bytes32 _txnId) external view returns (uint256) {
+        return txns[_txnId].ackCount;
+    }
+    
+    /// @notice Retorna se uma transação foi entregue
+    function isDelivered(bytes32 _txnId) external view returns (bool) {
+        return txns[_txnId].delivered;
+    }
+
 }
