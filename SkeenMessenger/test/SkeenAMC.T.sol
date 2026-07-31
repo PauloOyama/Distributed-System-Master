@@ -289,4 +289,34 @@ contract SkeenAMCTest is Test {
         console2.log("[DELIVER] finalTimestamp:", amcA.getFinalTimestamp(txnId));
         console2.log("[DELIVER] SUCESSO: protocolo de Skeen completo em 2 chains!");
     }
+
+      function test_NoDuplicateDelivery() public {
+        console2.log("=== test_NoDuplicateDelivery ===");
+
+        uint256 finalTs = 10;
+        bytes memory finalPayload = abi.encode(txnId, finalTs, destinations);
+
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(0),
+            abi.encode(SkeenAMC.Phase.FINAL, txnId, finalPayload));
+
+        // Entregar os dois ACKs normalmente
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_A, bytes32(0),
+            abi.encode(SkeenAMC.Phase.ACK, txnId, abi.encode(txnId, CHAIN_A, destinations)));
+
+        vm.prank(address(mailboxA));
+        amcA.handle(CHAIN_B, bytes32(0),
+            abi.encode(SkeenAMC.Phase.ACK, txnId, abi.encode(txnId, CHAIN_B, destinations)));
+
+        assertTrue(amcA.isDelivered(txnId));
+
+        // Tentar ACK duplicado da chain B — deve reverter (SR-06 implícito)
+        vm.prank(address(mailboxA));
+        vm.expectRevert("Chain ja enviou ACK");
+        amcA.handle(CHAIN_B, bytes32(0),
+            abi.encode(SkeenAMC.Phase.ACK, txnId, abi.encode(txnId, CHAIN_B, destinations)));
+
+        console2.log("[DELIVER] Nenhum segundo TxnDelivered emitido: OK");
+    }
 }
