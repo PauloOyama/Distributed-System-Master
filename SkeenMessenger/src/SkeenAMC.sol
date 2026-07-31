@@ -212,6 +212,11 @@ contract SkeenAMC is IMessageRecipient {
         t.finalTimestamp = finalTs;
         t.phase = Phase.ACK;
 
+        // Persistir destinations caso o estado ainda não os tenha (chain que só recebeu FINAL)
+        if (t.destinations.length == 0) {
+            t.destinations = destinations;
+        }
+
         // Obter o domain ID desta chain a partir do messenger
         uint32 localDomain = messenger.mailbox().localDomain();
 
