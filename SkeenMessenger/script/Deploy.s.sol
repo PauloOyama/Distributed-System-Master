@@ -9,7 +9,7 @@ contract Deploy is Script {
         address mailboxAddress = vm.envAddress("MAILBOX_ADDRESS");
         vm.startBroadcast();
 
-        SkeenMessenger messenger = new SkeenMessenger(mailboxAddress);
+        new SkeenMessenger(mailboxAddress);
 
         vm.stopBroadcast();
     }
