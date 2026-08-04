@@ -98,8 +98,8 @@ contract SkeenAMCTest is Test {
         messengerB = new SkeenMessenger(address(mailboxB));
 
         // Criar AMCs — mailbox é quem chama handle()
-        amcA = new SkeenAMC(address(messengerA), address(mailboxA));
-        amcB = new SkeenAMC(address(messengerB), address(mailboxB));
+        amcA = new SkeenAMC(address(mailboxA));
+        amcB = new SkeenAMC(address(mailboxB));
 
         // Dados padrão de teste
         destinations = new uint32[](2);

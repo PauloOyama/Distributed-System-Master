@@ -2,7 +2,8 @@
 pragma solidity ^0.8.19;
 
 import {IMessageRecipient} from "@hyperlane-xyz/core/interfaces/IMessageRecipient.sol";
-import {SkeenMessenger} from "./SkeenMessenger.sol";
+import {IMailbox} from "@hyperlane-xyz/core/interfaces/IMailbox.sol";
+import {IInterchainSecurityModule} from "@hyperlane-xyz/core/interfaces/IInterchainSecurityModule.sol";
 
 contract SkeenAMC is IMessageRecipient {
 
@@ -27,11 +28,8 @@ contract SkeenAMC is IMessageRecipient {
     /// @notice Relógio lógico  desta chain (incrementado a cada START recebido)
     uint256 public globalClock;
 
-    /// @notice Endereço do SkeenMessenger usado como transporte cross-chain
-    SkeenMessenger public immutable messenger;
-
-    /// @notice Endereço do Mailbox Hyperlane (para verificação de origem)
-    address public immutable mailbox;
+    /// @notice Mailbox Hyperlane desta chain
+    IMailbox public immutable mailbox;
 
     /// @notice Mapeamento de txnId para estado da transação
     mapping(bytes32 => TxnState) private txns;
@@ -65,9 +63,8 @@ contract SkeenAMC is IMessageRecipient {
     // Construtor
     // =========================================================================
 
-    constructor(address _messenger, address _mailbox) {
-        messenger = SkeenMessenger(payable(_messenger));
-        mailbox   = _mailbox;
+    constructor(address _mailbox) {
+        mailbox = IMailbox(_mailbox);
     }
 
     //TODO: FAZER TESTES 
@@ -117,7 +114,7 @@ contract SkeenAMC is IMessageRecipient {
         bytes32 /*_sender*/,
         bytes calldata _message
     ) external payable {
-        require(msg.sender == mailbox, "SkeenAMC: apenas o Mailbox pode chamar handle");
+        require(msg.sender == address(mailbox), "SkeenAMC: apenas o Mailbox pode chamar handle");
 
         (Phase phase, bytes32 txnId, bytes memory payload) =
             abi.decode(_message, (Phase, bytes32, bytes));
@@ -217,8 +214,8 @@ contract SkeenAMC is IMessageRecipient {
             t.destinations = destinations;
         }
 
-        // Obter o domain ID desta chain a partir do messenger
-        uint32 localDomain = messenger.mailbox().localDomain();
+        // Obter o domain ID desta chain a partir do mailbox
+        uint32 localDomain = mailbox.localDomain();
 
         emit AckSent(_txnId, localDomain);
         emit PhaseAdvanced(_txnId, Phase.ACK);
@@ -270,28 +267,26 @@ contract SkeenAMC is IMessageRecipient {
     // Utils
     // =========================================================================
 
+    /// @notice Retorna o ISM padrão do Mailbox (evita warnings do relayer)
+    function interchainSecurityModule() external view returns (IInterchainSecurityModule) {
+        return IInterchainSecurityModule(mailbox.defaultIsm());
+    }
+
     /// @notice Retorna o timestamp final de uma transação
     function getFinalTimestamp(bytes32 _txnId) external view returns (uint256) {
         return txns[_txnId].finalTimestamp;
     }
 
-    /// @dev Envia uma mensagem de protocolo via SkeenMessenger.
+    /// @dev Envia uma mensagem de protocolo via Mailbox diretamente para o SkeenAMC destino.
     function _sendProtocolMessage(
         uint32 _dest,
         Phase _phase,
         bytes memory _payload
     ) internal {
         bytes memory message = abi.encode(_phase, _payload);
-        uint256 fee = messenger.mailbox().quoteDispatch(
-            _dest,
-            bytes32(uint256(uint160(address(this)))),
-            message
-        );
-        messenger.sendMessage{value: fee}(
-            _dest,
-            address(this),
-            string(message)
-        );
+        bytes32 recipient = bytes32(uint256(uint160(address(this))));
+        uint256 fee = mailbox.quoteDispatch(_dest, recipient, message);
+        mailbox.dispatch{value: fee}(_dest, recipient, message);
     }
     
     /// @dev Calcula o máximo de um array de uint256.
