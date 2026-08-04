@@ -2,6 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+fs_permissions = [{ access = "read-write", path = "./script" }]
 remappings = [
     "@hyperlane-xyz/core/=lib/hyperlane-monorepo/solidity/contracts/",
     "@hyperlane-xyz/=lib/hyperlane-monorepo/solidity/",
