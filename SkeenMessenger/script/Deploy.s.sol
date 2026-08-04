@@ -6,9 +6,8 @@ import {SkeenMessenger} from "../src/SkeenMessenger.sol";
 
 contract Deploy is Script {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(deployerPrivateKey);
         address mailboxAddress = vm.envAddress("MAILBOX_ADDRESS");
+        vm.startBroadcast();
 
         SkeenMessenger messenger = new SkeenMessenger(mailboxAddress);
 
