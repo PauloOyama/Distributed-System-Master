@@ -8,18 +8,16 @@ import {SkeenAMC} from "../src/SkeenAMC.sol";
 /// @notice Deploy do SkeenAMC nas chains Anvil locais.
 contract DeployAMC is Script {
     function run() external {
-        address mailboxAddress    = vm.envAddress("MAILBOX_ADDRESS");
-        address messengerAddress  = vm.envAddress("SKEEN_MESSENGER");
+        address mailboxAddress = vm.envAddress("MAILBOX_ADDRESS");
 
         console2.log("[DEPLOY] Iniciando deploy do SkeenAMC");
         console2.log("[DEPLOY] Mailbox:            ", mailboxAddress);
-        console2.log("[DEPLOY] SkeenMessenger:     ", messengerAddress);
         console2.log("[DEPLOY] Chain ID:           ", block.chainid);
         console2.log("[DEPLOY] RPC block:          ", block.number);
 
         vm.startBroadcast();
 
-        SkeenAMC amc = new SkeenAMC(messengerAddress, mailboxAddress);
+        SkeenAMC amc = new SkeenAMC(mailboxAddress);
 
         vm.stopBroadcast();
 

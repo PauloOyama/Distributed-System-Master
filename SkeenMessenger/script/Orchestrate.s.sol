@@ -12,6 +12,14 @@ contract Orchestrate is Script {
     uint32 constant DOMAIN_B = 31338;
     uint32 constant DOMAIN_C = 31339;
 
+    function castLogs(string memory rpc, address addr) internal pure returns (string memory) {
+        return string.concat(
+            "  cast logs --rpc-url ", rpc,
+            " --address ", vm.toString(addr),
+            " --from-block 0"
+        );
+    }
+
     function run() external {
         address amcA        = vm.envAddress("AMC_A");
         address amcB        = vm.envAddress("AMC_B");
@@ -39,10 +47,10 @@ contract Orchestrate is Script {
         console2.log("=================================================================");
         console2.log("[ORCHESTRATOR] Protocolo de Skeen - Simulacao Local 3-chain");
         console2.log("=================================================================");
-        console2.log("[ORCHESTRATOR] Chain A (AMC):  ", amcA);
-        console2.log("[ORCHESTRATOR] Chain B (AMC):  ", amcB);
-        console2.log("[ORCHESTRATOR] Chain C (AMC):  ", amcC);
-        console2.log("[ORCHESTRATOR] Destinations:   [31337, 31338, 31339]");
+        console2.log(string.concat("[ORCHESTRATOR] Chain A (AMC):   ", vm.toString(amcA)));
+        console2.log(string.concat("[ORCHESTRATOR] Chain B (AMC):   ", vm.toString(amcB)));
+        console2.log(string.concat("[ORCHESTRATOR] Chain C (AMC):   ", vm.toString(amcC)));
+        console2.log("[ORCHESTRATOR] Destinations:    [31337, 31338, 31339]");
         console2.log("[ORCHESTRATOR] txnId:");
         console2.logBytes32(txnId);
         console2.log("[ORCHESTRATOR] Block:          ", block.number);
@@ -63,17 +71,17 @@ contract Orchestrate is Script {
         console2.log("[START] multicast() enviado. Phase:", uint8(skeenAMC.getPhase(txnId)));
         console2.log("[START] Aguardando relayer entregar START para as chains B e C...");
         console2.log("[START] Verifique:");
-        console2.log("  cast logs --rpc-url http://localhost:8546 --address", amcB, "--from-block 0");
-        console2.log("  cast logs --rpc-url http://localhost:8547 --address", amcC, "--from-block 0");
+        console2.log(castLogs("http://localhost:8546", amcB));
+        console2.log(castLogs("http://localhost:8547", amcC));
         console2.log("");
 
         console2.log("--- RODADA 2: LOCAL_TS + FINAL ---");
         console2.log("[LOCAL_TS] Cada chain atribuira seu globalClock como timestamp local.");
         console2.log("[LOCAL_TS] globalClock Chain A:", skeenAMC.globalClock());
         console2.log("[LOCAL_TS] Aguardando LOCAL_TS de todas as chains...");
-        console2.log("[LOCAL_TS] Monitor Chain A: cast logs --rpc-url http://localhost:8545 --address", amcA, "--from-block 0");
-        console2.log("[LOCAL_TS] Monitor Chain B: cast logs --rpc-url http://localhost:8546 --address", amcB, "--from-block 0");
-        console2.log("[LOCAL_TS] Monitor Chain C: cast logs --rpc-url http://localhost:8547 --address", amcC, "--from-block 0");
+        console2.log(string.concat("[LOCAL_TS] Monitor Chain A: ", castLogs("http://localhost:8545", amcA)));
+        console2.log(string.concat("[LOCAL_TS] Monitor Chain B: ", castLogs("http://localhost:8546", amcB)));
+        console2.log(string.concat("[LOCAL_TS] Monitor Chain C: ", castLogs("http://localhost:8547", amcC)));
         console2.log("");
 
         console2.log("[FINAL] Quando todos os LOCAL_TS chegarem, FinalTsCalculated sera emitido.");
@@ -94,24 +102,22 @@ contract Orchestrate is Script {
         console2.log("=================================================================");
         console2.log("[ORCHESTRATOR] Para monitorar o protocolo em tempo real:");
         console2.log("");
-        console2.log("  # Todos os eventos da Chain A:");
-        console2.log("  cast logs --rpc-url http://localhost:8545");
-        console2.log("    --address", amcA);
-        console2.log("    --from-block 0");
+        console2.log("  # Chain A:");
+        console2.log(castLogs("http://localhost:8545", amcA));
         console2.log("");
-        console2.log("  # Todos os eventos da Chain B:");
-        console2.log("  cast logs --rpc-url http://localhost:8546");
-        console2.log("    --address", amcB);
-        console2.log("    --from-block 0");
+        console2.log("  # Chain B:");
+        console2.log(castLogs("http://localhost:8546", amcB));
         console2.log("");
-        console2.log("  # Todos os eventos da Chain C:");
-        console2.log("  cast logs --rpc-url http://localhost:8547");
-        console2.log("    --address", amcC);
-        console2.log("    --from-block 0");
+        console2.log("  # Chain C:");
+        console2.log(castLogs("http://localhost:8547", amcC));
         console2.log("");
-        console2.log("  # Verificar entrega na Chain A:");
-        console2.log("  cast call <AMC_A> \"isDelivered(bytes32)(bool)\" <txnId> --rpc-url http://localhost:8545");
-        console2.log("  AMC_A:", amcA);
+        console2.log("  # Verificar entrega (substitua <txnId>):");
+        console2.log(string.concat(
+            "  cast call ", vm.toString(amcA),
+            " \"isDelivered(bytes32)(bool)\" ",
+            Strings.toHexString(uint256(txnId), 32),
+            " --rpc-url http://localhost:8545"
+        ));
         console2.log("=================================================================");
     }
 }
